@@ -1,0 +1,102 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: manufacturing-mqtt
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+  machine-simulator:
+    image: python:3.11-slim
+    container_name: manufacturing-machine-simulator
+    depends_on:
+      - mqtt
+    volumes:
+      - ./simulators:/app/simulators
+    command: >
+      sh -c "pip install --no-cache-dir paho-mqtt==2.1.0 &&
+      python /app/simulators/machine_simulator.py --host mqtt --port 1883 --interval-sec 1"
+
+  postgres:
+    image: postgres:16
+    container_name: manufacturing-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-manufacturing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manufacturing}
+      POSTGRES_DB: ${POSTGRES_DB:-airflow_meta}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-manufacturing} -d ${POSTGRES_DB:-airflow_meta}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow:
+    build: .
+    image: manufacturing-airflow:latest
+    container_name: manufacturing-airflow
+    depends_on:
+      mqtt:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-manufacturing}:${POSTGRES_PASSWORD:-manufacturing}@postgres:5432/${POSTGRES_DB:-airflow_meta}
+      POSTGRES_USER: ${POSTGRES_USER:-manufacturing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manufacturing}
+      POSTGRES_DB: ${MANUFACTURING_DB:-manufacturing_dw}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      MQTT_HOST: mqtt
+      MQTT_PORT: 1883
+      PYTHONPATH: /opt/airflow
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./data:/opt/airflow/data
+      - ./data_generation:/opt/airflow/data_generation
+      - ./docker:/opt/airflow/docker
+      - ./ingestion:/opt/airflow/ingestion
+      - ./quality:/opt/airflow/quality
+      - ./spark:/opt/airflow/spark
+      - ./sql:/opt/airflow/sql
+      - ./storage:/opt/airflow/storage
+    command: bash /opt/airflow/docker/start_airflow.sh
+
+  flow-viewer:
+    image: python:3.11-slim
+    container_name: manufacturing-flow-viewer
+    depends_on:
+      mqtt:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-manufacturing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manufacturing}
+      POSTGRES_DB: ${MANUFACTURING_DB:-manufacturing_dw}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      MQTT_HOST: mqtt
+      MQTT_PORT: 1883
+      DATA_DIR: /app/data
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./app/requirements.txt:/app/requirements.txt
+    command: >
+      sh -c "pip install --no-cache-dir -r /app/requirements.txt &&
+      streamlit run /app/app/flow_viewer.py --server.address 0.0.0.0 --server.port 8501"
+
+volumes:
+  postgres_data:

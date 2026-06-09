@@ -1,0 +1,13 @@
+.env
+.env.example
+__pycache__/
+*.py[cod]
+
+data/raw/*.csv
+data/processed/*
+!data/processed/.gitkeep
+
+.airflow/
+.venv/
+logs/
+
