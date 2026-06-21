@@ -48,6 +48,7 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-manufacturing}:${POSTGRES_PASSWORD:-manufacturing}@postgres:5432/${POSTGRES_DB:-airflow_meta}
       POSTGRES_USER: ${POSTGRES_USER:-manufacturing}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-manufacturing}
@@ -87,6 +88,9 @@ services:
       POSTGRES_PORT: 5432
       MQTT_HOST: mqtt
       MQTT_PORT: 1883
+      AIRFLOW_API_BASE_URL: http://airflow:8080/api/v1
+      AIRFLOW_USERNAME: airflow
+      AIRFLOW_PASSWORD: airflow
       DATA_DIR: /app/data
     ports:
       - "8501:8501"

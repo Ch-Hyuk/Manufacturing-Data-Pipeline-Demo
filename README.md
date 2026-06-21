@@ -148,6 +148,16 @@ docker compose up --build -d
 | `Raw Layer` | raw CSV와 PostgreSQL raw table row count 확인 |
 | `Data Mart` | 생산량, 불량률, 설비 health status KPI와 차트 확인 |
 
+Flow Viewer의 `Flow` 탭에서는 Airflow UI에 직접 접속하지 않아도 `Run Pipeline` 버튼으로 `manufacturing_data_pipeline` DAG를 실행할 수 있습니다. Flow Viewer는 Airflow REST API를 호출하고, Airflow는 백엔드 오케스트레이션 엔진으로 MQTT 수집, raw 검증, Spark ETL, PostgreSQL 적재, Data Mart 생성을 수행합니다.
+
+```text
+Flow Viewer Run Pipeline button
+  -> Airflow REST API
+  -> manufacturing_data_pipeline DAG
+  -> MQTT collection / ETL / Data Mart
+  -> Flow Viewer result monitoring
+```
+
 ## 가상 설비 On/Off 제어
 
 Flow Viewer의 `Flow` 탭에서 `Start Publishing`, `Stop Publishing` 버튼으로 가상 설비의 MQTT publish 상태를 제어할 수 있습니다.

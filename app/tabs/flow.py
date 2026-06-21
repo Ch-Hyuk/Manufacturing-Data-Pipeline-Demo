@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import streamlit as st
+from requests import RequestException
 
 from shared.config import DATA_DIR, MART_TABLES, MQTT_CONTROL_TOPIC, RAW_FILES
+from shared.airflow_api import get_pipeline_snapshot, trigger_pipeline
 from shared.data_access import file_row_count, raw_files_ready, raw_tables_ready, table_count
 from shared.mqtt_control import get_simulator_status, mqtt_is_reachable, publish_simulator_command
 
@@ -70,6 +72,51 @@ def render_simulator_control() -> None:
     st.caption(f"Control topic: {MQTT_CONTROL_TOPIC}")
 
 
+def render_pipeline_control() -> None:
+    with st.container(border=True):
+        st.subheader("Pipeline Control")
+        left, right = st.columns([1, 2])
+
+        if left.button("Run Pipeline", use_container_width=True):
+            try:
+                dag_run = trigger_pipeline()
+                st.success(f"Triggered DAG run: {dag_run.get('dag_run_id')}")
+                st.cache_data.clear()
+            except RequestException as exc:
+                st.error(f"Failed to trigger Airflow DAG: {exc}")
+
+        try:
+            snapshot = get_pipeline_snapshot()
+        except RequestException as exc:
+            right.warning(f"Airflow API is not available yet: {exc}")
+            return
+
+        dag_run = snapshot["dag_run"]
+        task_instances = snapshot["task_instances"]
+
+        if not dag_run:
+            right.info("No DAG run has been created yet.")
+            return
+
+        status_col1, status_col2, status_col3 = right.columns(3)
+        status_col1.metric("Latest Run", dag_run.get("dag_run_id", "-"))
+        status_col2.metric("State", dag_run.get("state", "-"))
+        status_col3.metric("Run Type", dag_run.get("run_type", "-"))
+
+        if task_instances:
+            rows = [
+                {
+                    "task_id": task.get("task_id"),
+                    "state": task.get("state"),
+                    "try_number": task.get("try_number"),
+                    "start_date": task.get("start_date"),
+                    "end_date": task.get("end_date"),
+                }
+                for task in task_instances
+            ]
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
 def render_graph() -> None:
     st.graphviz_chart(
         """
@@ -117,6 +164,6 @@ def render_flow_cards() -> None:
 
 def render_flow_tab() -> None:
     render_simulator_control()
+    render_pipeline_control()
     render_graph()
     render_flow_cards()
-

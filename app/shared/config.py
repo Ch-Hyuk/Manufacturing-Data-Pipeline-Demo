@@ -18,6 +18,7 @@ RAW_FILES = {
 
 RAW_TABLES = ["raw_sensor_data", "raw_production_data", "raw_quality_data"]
 MART_TABLES = ["dm_daily_production", "dm_daily_quality", "dm_machine_health"]
+AIRFLOW_DAG_ID = "manufacturing_data_pipeline"
 
 NUMERIC_COLUMNS = {
     "temperature",
@@ -48,3 +49,14 @@ def mqtt_host() -> str:
 def mqtt_port() -> int:
     return int(os.getenv("MQTT_PORT", "1883"))
 
+
+def airflow_api_base_url() -> str:
+    return os.getenv("AIRFLOW_API_BASE_URL", "http://localhost:8080/api/v1")
+
+
+def airflow_username() -> str:
+    return os.getenv("AIRFLOW_USERNAME", "airflow")
+
+
+def airflow_password() -> str:
+    return os.getenv("AIRFLOW_PASSWORD", "airflow")
